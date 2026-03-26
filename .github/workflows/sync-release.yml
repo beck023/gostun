@@ -1,0 +1,35 @@
+name: Sync Releases
+
+on:
+  workflow_dispatch:   # 仅手动触发
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+
+      - name: Install GitHub CLI
+        uses: cli/cli@v2
+
+      - name: Download release assets from upstream
+        run: |
+          # 设置原仓库和 fork 仓库
+          UPSTREAM="oneclickvirt/gostun"
+          FORK="beck023/gostun"
+
+          # 获取最新 release 的 tag
+          TAG=$(gh release list -R $UPSTREAM --limit 1 | awk '{print $1}')
+
+          echo "最新 release tag: $TAG"
+
+          # 下载 release 文件
+          mkdir -p release_assets
+          gh release download $TAG -R $UPSTREAM --dir release_assets
+
+          # 在 fork 仓库发布同样的 release
+          gh release create $TAG release_assets/* \
+            -R $FORK \
+            --title "$TAG" \
+            --notes "同步自 $UPSTREAM"
