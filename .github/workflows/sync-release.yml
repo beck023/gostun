@@ -10,25 +10,29 @@ jobs:
       - name: Checkout fork
         uses: actions/checkout@v4
 
-      - name: Install GitHub CLI
-        uses: actions/cli@v2
+      - name: Authenticate GitHub CLI
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
-      - name: Download release assets from upstream
+      - name: Sync latest release
         run: |
-          # 设置原仓库和 fork 仓库
           UPSTREAM="oneclickvirt/gostun"
           FORK="beck023/gostun"
 
           # 获取最新 release 的 tag
-          TAG=$(gh release list -R $UPSTREAM --limit 1 | awk '{print $1}')
-
+          TAG=$(gh release list -R $UPSTREAM --limit 1 --json tagName --jq '.[0].tagName')
           echo "最新 release tag: $TAG"
 
           # 下载 release 文件
           mkdir -p release_assets
           gh release download $TAG -R $UPSTREAM --dir release_assets
 
-          # 在 fork 仓库发布同样的 release
+          # 如果 fork 已经有这个 release，就先删除再创建
+          if gh release view $TAG -R $FORK >/dev/null 2>&1; then
+            echo "Fork 已存在该 release，先删除"
+            gh release delete $TAG -R $FORK -y
+          fi
+
+          # 创建 release
           gh release create $TAG release_assets/* \
             -R $FORK \
             --title "$TAG" \
